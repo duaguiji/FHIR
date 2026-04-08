@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APSH 運動生理監測系統</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; line-height: 1.6; background-color: #f4f7f6; }
+        .container { max-width: 500px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin: auto; }
+        h2 { color: #2c3e50; text-align: center; }
+        label { display: block; margin: 10px 0 5px; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
+        button { width: 100%; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 4px; margin-top: 20px; cursor: pointer; }
+        button:hover { background: #219150; }
+        #result { margin-top: 20px; padding: 15px; border-radius: 4px; display: none; }
+        .warn { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+        .success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        pre { background: #eee; padding: 10px; font-size: 12px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>運動生理數值登記</h2>
+    
+    <label>使用者編號 (Patient ID)</label>
+    <input type="text" id="patientId" placeholder="例如: NTUST-115001">
+
+    <label>運動場所 (Location)</label>
+    <select id="location">
+        <option value="Gym-NTUST">台科大健身房</option>
+        <option value="Track-NTUST">台科大操場</option>
+        <option value="Sports-Center">大安運動中心</option>
+    </select>
+
+    <label>運動後心率 (Heart Rate - BPM)</label>
+    <input type="number" id="hr" placeholder="請輸入數值">
+
+    <label>運動後血氧 (SpO2 - %)</label>
+    <input type="number" id="spo2" placeholder="請輸入數值">
+
+    <button onclick="processData()">送出評估並產出 FHIR JSON</button>
+
+    <div id="result"></div>
+    
+    <div id="fhirOutput" style="display:none;">
+        <h3>產出的 FHIR JSON (準備傳送至 Server)</h3>
+        <pre id="jsonPreview"></pre>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
