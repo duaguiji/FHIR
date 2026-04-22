@@ -1,90 +1,33 @@
-資料規格文件 (FHIR Data Specification)
-本專案採用 HL7 FHIR R4 標準作為運動生理數據交換格式。以下說明本系統所使用的資源 (Resources) 及其欄位定義。
+# 資料規格文件 (FHIR Data Specification)
 
-1. 使用之 Resource 種類
-本系統主要運用以下四種 Resource：
+## 1. 使用之 Resource 定義
+本系統採用 **Observation** 資源作為多維度生理指標的載體，將相關連的數據（血壓、心率、氣溫）封裝在同一個資源實例中。
 
-Patient: 使用者基本識別。
-
-Observation: 核心運動生理指標（心率、血氧）。
-
-Location: 運動量測發生之場域資訊。
-
-Organization: 負責管理場館與資料之行政單位。
-## 2. 詳細欄位定義 (Observation)
-這是本系統最核心的資料格式，用於記錄運動後的生理狀態。
-
-| 欄位名稱 (Element) | 子欄位 (Sub-element) | 說明 (Description) | 使用代碼/範例值 |
+## 2. Observation 欄位詳細定義
+| 欄位名稱 (Element) | 子欄位 | 說明 | 標準代碼 / 範例值 |
 | :--- | :--- | :--- | :--- |
-| **status** | - | 資料狀態 | `final` (代表已完成量測) |
-| **category** | coding | 資料分類 | `vital-signs` (生命徵象) |
-| **code** | coding | 量測項目標準代碼 | **心率**: LOINC `8867-4`<br>**血氧**: LOINC `2708-6` |
-| **subject** | reference | 指向的使用者 | `Patient/{ID}` |
-| **effectiveDateTime** | - | 量測時間 | ISO 8601 格式 |
-| **valueQuantity** | value / unit | 量測數值與單位 | 例如: `98` / `%` 或 `75` / `BPM` |
-| **note** | text | 系統產出的評估建議 | 「偵測到疲勞風險，請立即休息」 |
-Gemini 說了
-這份檔案 fhir_spec.md 是你的資料規格說明書。它的目的不是寫程式碼，而是要告訴評審：「在我的系統裡，我決定用哪些 FHIR 欄位來存資料，以及這些資料代表什麼意義。」
+| **status** | - | 資料狀態 | `final` |
+| **subject** | reference | 指向使用者 | `Patient/{ID}` |
+| **effectiveDateTime** | - | 臨床有效時間 | ISO 8601 格式 |
+| **valueQuantity** | - | 主數值 (血氧) | LOINC `2708-6` |
+| **note** | text | 運動類別標籤 | 如: `Running`, `Swimming` |
 
-身為台科大電子系的學生，這份文件能展現你對資料結構與國際醫療標準的嚴謹度。以下我幫你寫好這份文件的內容，你可以直接複製並建立一個 fhir_spec.md 檔案。
+### Component (多組件) 定義
+為了在同一個量測事件中紀錄多項指標，我們使用了 component：
+* **收縮壓 (SBP)**: LOINC `8480-6`, 單位 `mmHg`
+* **舒張壓 (DBP)**: LOINC `8462-4`, 單位 `mmHg`
+* **心率 (Heart Rate)**: LOINC `8867-4`, 單位 `BPM`
+* **環境氣溫 (Temp)**: LOINC `60832-3`, 單位 `C`
 
-資料規格文件 (FHIR Data Specification)
-本專案採用 HL7 FHIR R4 標準作為運動生理數據交換格式。以下說明本系統所使用的資源 (Resources) 及其欄位定義。
+## 3. 臨床警告評估標準 (Blood Pressure Levels)
+系統內建之自動判斷邏輯遵循以下標準：
+* **Normal**: SBP < 130 且 DBP < 85
+* **Elevated (🟡)**: SBP 131-139 或 DBP 85-89
+* **Stage 1 (🟠)**: SBP 140-159 或 DBP 90-99
+* **Stage 2 (🔴)**: SBP 160-179 或 DBP 100-109
+* **Emergency (🚨)**: SBP ≥ 180 或 DBP ≥ 110
 
-1. 使用之 Resource 種類
-本系統主要運用以下四種 Resource：
-
-Patient: 使用者基本識別。
-
-Observation: 核心運動生理指標（心率、血氧）。
-
-Location: 運動量測發生之場域資訊。
-
-Organization: 負責管理場館與資料之行政單位。
-
-2. 詳細欄位定義 (Observation)
-這是本系統最核心的資料格式，用於記錄運動後的生理狀態。
-
-欄位名稱 (Element)	子欄位 (Sub-element)	說明 (Description)	使用代碼/範例值
-status	-	資料狀態	final (代表已完成量測)
-category	coding	資料分類	vital-signs (生命徵象)
-code	coding	量測項目標準代碼	
-心率: LOINC 8867-4
-
-
-血氧: LOINC 2708-6
-
-subject	reference	指向的使用者	Patient/{ID}
-effectiveDateTime	-	量測時間	ISO 8601 格式 (如: 2026-04-08T...)
-valueQuantity	value / unit	量測數值與單位	例如: 98 / % 或 75 / BPM
-note	text	系統產出的評估建議	「偵測到疲勞風險，請立即休息」
-3. 代碼系統 (Terminology / Coding)
-為了確保跨系統的相容性，本專案採用以下國際標準代碼：
-
-心率 (Heart Rate)
-System: http://loinc.org
-
-Code: 8867-4
-
-Display: Heart rate
-
-血氧飽和度 (SpO2)
-System: http://loinc.org
-
-Code: 2708-6
-
-Display: Oxygen saturation in Arterial blood by Pulse oxymetry
-
-4. 擴充欄位 (Extensions)
-為了記錄運動發生的「場所」，我們在 Observation 中加入了場域資訊的擴充：
-
-Extension URL: http://example.org/location
-
-Value: 記錄使用者所在的 Location 代碼 (如: NTUST-Gym)。
-
-5. 資料交互邏輯
-系統會透過 HTTP POST 方法將封裝好的 JSON 傳送至 FHIR Server。
-
-Endpoint: [大會提供之伺服器位址]/Observation
-
-Header: Content-Type: application/fhir+json
+## 4. 數據交互規範
+* **Endpoint**: `https://hapi.fhir.org/baseR4/Observation`
+* **Method**: `POST` (上傳資料), `GET` (查詢範圍資料)
+* **Query Parameters**: 使用 `date=ge[start]` 與 `date=le[end]` 進行時間區間過濾。
