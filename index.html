@@ -2,53 +2,80 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>APSH 運動生理監測系統</title>
+    <title>APSH | 專業生理診斷系統</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; line-height: 1.6; background-color: #f4f7f6; }
-        .container { max-width: 500px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin: auto; }
-        h2 { color: #2c3e50; text-align: center; }
-        label { display: block; margin: 10px 0 5px; }
-        input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 4px; }
-        button { width: 100%; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 4px; margin-top: 20px; cursor: pointer; }
-        button:hover { background: #219150; }
-        #result { margin-top: 20px; padding: 15px; border-radius: 4px; display: none; }
-        .warn { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
-        .success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
-        pre { background: #eee; padding: 10px; font-size: 12px; overflow-x: auto; }
+        :root { --ntust-red: #9e1b32; --primary: #2c3e50; --success: #27ae60; --info: #3498db; --warning: #f39c12; }
+        body { font-family: 'PingFang TC', sans-serif; background: #f4f7f9; margin: 0; padding: 20px; }
+        .page { display: none; max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .active { display: block; }
+        .section { border: 1px solid #eee; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .control-panel { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 20px; background: #eef2f7; padding: 15px; border-radius: 8px; flex-wrap: wrap; }
+        label { display: block; font-size: 12px; margin-bottom: 4px; font-weight: bold; }
+        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        button { padding: 12px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-main { background: var(--success); color: white; width: 100%; margin-top: 15px; }
+        .btn-query { background: var(--primary); color: white; }
+        .btn-switch { background: #95a5a6; color: white; width: 100%; margin-top: 15px; }
+
+        /* 單日列表樣式 */
+        .day-card { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; border-left: 8px solid #ccc; }
+        .card-header { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
+        .data-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
+        .data-item { font-size: 14px; }
+        .data-value { font-size: 18px; font-weight: bold; color: var(--primary); }
+        
+        /* 週模式圖表 */
+        .chart-container { position: relative; height: 280px; width: 100%; margin-bottom: 30px; display: none; }
+        .advice-card { padding: 15px; background: #fdfaf0; border-left: 8px solid var(--warning); border-radius: 8px; margin-bottom: 20px; line-height: 1.6; }
+        h3 { border-left: 5px solid var(--ntust-red); padding-left: 10px; margin-top: 25px; color: var(--primary); }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>運動生理數值登記</h2>
-    
-    <label>使用者編號 (Patient ID)</label>
-    <input type="text" id="patientId" placeholder="例如: NTUST-115001">
-
-    <label>運動場所 (Location)</label>
-    <select id="location">
-        <option value="Gym-NTUST">台科大健身房</option>
-        <option value="Track-NTUST">台科大操場</option>
-        <option value="Sports-Center">大安運動中心</option>
-    </select>
-
-    <label>運動後心率 (Heart Rate - BPM)</label>
-    <input type="number" id="hr" placeholder="請輸入數值">
-
-    <label>運動後血氧 (SpO2 - %)</label>
-    <input type="number" id="spo2" placeholder="請輸入數值">
-
-    <button onclick="processData()">送出評估並產出 FHIR JSON</button>
-
-    <div id="result"></div>
-    
-    <div id="fhirOutput" style="display:none;">
-        <h3>產出的 FHIR JSON (準備傳送至 Server)</h3>
-        <pre id="jsonPreview"></pre>
+    <div id="inputPage" class="page active">
+        <h2 style="color:var(--ntust-red); text-align:center;">📥 生理數據登記</h2>
+        <div class="section">
+            <label>Patient ID </label><input type="text" id="patientId" placeholder="110">
+            <label>量測時間</label><input type="datetime-local" id="measureTime">
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <div style="flex:1;"><label>運動類別</label><select id="sportType"><option value="Running">🏃 跑步</option><option value="Swimming">🏊 游泳</option><option value="Weightlifting">🏋️ 重訓</option></select></div>
+                <div style="flex:1;"><label>氣溫 (°C)</label><input type="number" id="temp" value="25"></div>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:10px;">
+                <input type="number" id="sbp" placeholder="收縮壓">
+                <input type="number" id="dbp" placeholder="舒張壓">
+                <input type="number" id="hr" placeholder="心率">
+            </div>
+            <button class="btn-main" onclick="uploadData()">✅ 同步至雲端</button>
+        </div>
+        <button class="btn-switch" onclick="switchPage('queryPage')">🔍 進入查詢分析 →</button>
     </div>
-</div>
 
-<script src="script.js"></script>
+    <div id="queryPage" class="page">
+        <button onclick="switchPage('inputPage')" style="background:none; color:var(--info); border:none; cursor:pointer;">← 返回登記</button>
+        <h2 style="text-align:center;">📊 生理分析報告</h2>
+
+        <div class="control-panel">
+            <div style="flex:1;"><label>Patient ID</label><input type="text" id="queryId"></div>
+            <div style="flex:1;"><label>選擇日期</label><input type="date" id="queryDate"></div>
+            <div style="flex:1;"><label>分析模式</label><select id="queryMode"><option value="day">單日詳細列表</option><option value="week">週平均趨勢圖</option></select></div>
+            <button class="btn-query" onclick="fetchAndAnalyze()">開始分析</button>
+        </div>
+
+        <div id="resultContent" style="display:none;">
+            <div id="adviceBox" class="advice-card"></div>
+            
+            <div id="dayListSection"></div>
+
+            <div id="weekChartsSection">
+                <h3>🩺 血壓趨勢 (SBP/DBP)</h3><div class="chart-container" style="display:block;"><canvas id="chartBP"></canvas></div>
+                <h3>💓 心率趨勢 (HR)</h3><div class="chart-container" style="display:block;"><canvas id="chartHR"></canvas></div>
+                <h3>🌡️ 氣溫趨勢</h3><div class="chart-container" style="display:block;"><canvas id="chartTemp"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
