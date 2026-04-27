@@ -1,33 +1,29 @@
 # 資料規格文件 (FHIR Data Specification)
 
-## 1. 使用之 Resource 定義
-本系統採用 **Observation** 資源作為多維度生理指標的載體，將相關連的數據（血壓、心率、氣溫）封裝在同一個資源實例中。
+## 1. 使用之 Resource 種類
+* **Patient**: 記錄使用者基本識別（姓名、性別、生日）及管理組織。
+* **Observation**: 核心運動生理指標（血壓多組件、心率、氣溫）。
 
-## 2. Observation 欄位詳細定義
+## 2. 詳細欄位定義 (Observation)
 | 欄位名稱 (Element) | 子欄位 | 說明 | 標準代碼 / 範例值 |
 | :--- | :--- | :--- | :--- |
 | **status** | - | 資料狀態 | `final` |
 | **subject** | reference | 指向使用者 | `Patient/{ID}` |
-| **effectiveDateTime** | - | 臨床有效時間 | ISO 8601 格式 |
-| **valueQuantity** | - | 主數值 (血氧) | LOINC `2708-6` |
-| **note** | text | 運動類別標籤 | 如: `Running`, `Swimming` |
+| **effectiveDateTime** | - | 臨床有效時間 | 不可選未來日期 |
+| **component** | coding | 血壓/心率/氣溫 | LOINC 相關代碼 |
 
-### Component (多組件) 定義
-為了在同一個量測事件中紀錄多項指標，我們使用了 component：
-* **收縮壓 (SBP)**: LOINC `8480-6`, 單位 `mmHg`
-* **舒張壓 (DBP)**: LOINC `8462-4`, 單位 `mmHg`
-* **心率 (Heart Rate)**: LOINC `8867-4`, 單位 `BPM`
-* **環境氣溫 (Temp)**: LOINC `60832-3`, 單位 `C`
+### 臨床警告評估標準 (CDSS Logic)
+系統對 `Observation` 的診斷邏輯參考國際標準：
 
-## 3. 臨床警告評估標準 (Blood Pressure Levels)
-系統內建之自動判斷邏輯遵循以下標準：
-* **Normal**: SBP < 130 且 DBP < 85
-* **Elevated (🟡)**: SBP 131-139 或 DBP 85-89
-* **Stage 1 (🟠)**: SBP 140-159 或 DBP 90-99
-* **Stage 2 (🔴)**: SBP 160-179 或 DBP 100-109
-* **Emergency (🚨)**: SBP ≥ 180 或 DBP ≥ 110
+| 等級 | 診斷狀態 | 顏色識別 | 處置建議範例 |
+| :--- | :--- | :--- | :--- |
+| **Level 4** | 🚨 緊急危急值 | `#9e1b32` | 血壓極高！請停止活動並立即就醫。 |
+| **Level 3** | 🔴 二級高血壓 | `#d32f2f` | 應絕對停止訓練，靜坐休息。 |
+| **Level 2** | 🟠 一級高血壓 | `#e67e22` | 建議調降訓練強度，休息後再確認。 |
+| **Level 1** | 🟡 偏高 | `#f1c40f` | 生理負荷稍重，注意訓練壓力。 |
+| **Heat Risk**| 🌡️ 熱衰竭預兆 | `red` | 高溫環境且心率過快，立即補水。 |
 
-## 4. 數據交互規範
-* **Endpoint**: `https://hapi.fhir.org/baseR4/Observation`
-* **Method**: `POST` (上傳資料), `GET` (查詢範圍資料)
-* **Query Parameters**: 使用 `date=ge[start]` 與 `date=le[end]` 進行時間區間過濾。
+## 3. 數據交互規範 (RESTful)
+* **Create (POST)**: `.../Patient` 或 `.../Observation`
+* **Read (GET)**: `.../Patient/{id}` 或 `.../Observation?subject=Patient/{id}`
+* **Delete (DELETE)**: `.../Observation/{id}` (用於數據修正機制)
