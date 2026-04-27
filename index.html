@@ -2,77 +2,109 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>APSH | 專業生理診斷系統</title>
+    <title>APSH | 跨場域運動生理監測系統</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --ntust-red: #9e1b32; --primary: #2c3e50; --success: #27ae60; --info: #3498db; --warning: #f39c12; }
-        body { font-family: 'PingFang TC', sans-serif; background: #f4f7f9; margin: 0; padding: 20px; }
-        .page { display: none; max-width: 900px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        :root { --ntust-red: #9e1b32; --primary: #2c3e50; --success: #27ae60; --info: #3498db; --warning: #f39c12; --danger: #d32f2f; }
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: #f4f7f9; margin: 0; padding: 20px; }
+        .page { display: none; max-width: 950px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
         .active { display: block; }
-        .section { border: 1px solid #eee; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .control-panel { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 20px; background: #eef2f7; padding: 15px; border-radius: 8px; flex-wrap: wrap; }
-        label { display: block; font-size: 12px; margin-bottom: 4px; font-weight: bold; }
-        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; }
-        button { padding: 12px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn-main { background: var(--success); color: white; width: 100%; margin-top: 15px; }
-        .btn-query { background: var(--primary); color: white; }
-        .btn-switch { background: #95a5a6; color: white; width: 100%; margin-top: 15px; }
-
-        /* 單日列表樣式 */
-        .day-card { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; border-left: 8px solid #ccc; }
-        .card-header { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
-        .data-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; }
-        .data-item { font-size: 14px; }
-        .data-value { font-size: 18px; font-weight: bold; color: var(--primary); }
         
-        /* 週模式圖表 */
-        .chart-container { position: relative; height: 280px; width: 100%; margin-bottom: 30px; display: none; }
-        .advice-card { padding: 15px; background: #fdfaf0; border-left: 8px solid var(--warning); border-radius: 8px; margin-bottom: 20px; line-height: 1.6; }
-        h3 { border-left: 5px solid var(--ntust-red); padding-left: 10px; margin-top: 25px; color: var(--primary); }
+        /* 表單與佈局 */
+        .section { border: 1px solid #eee; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; }
+        button { padding: 12px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.3s; width: 100%; margin-bottom: 10px; }
+        .btn-main { background: var(--success); color: white; }
+        .btn-query { background: var(--primary); color: white; }
+        .btn-switch { background: #95a5a6; color: white; }
+        .btn-delete { background: none; border: 1px solid #e74c3c; color: #e74c3c; padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer; width: auto; }
+        .btn-delete:hover { background: #e74c3c; color: white; }
+
+        /* 資訊呈現 */
+        .user-info-bar { background: #eef2f7; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .advice-card { padding: 20px; background: #fdfaf0; border-left: 8px solid var(--warning); border-radius: 8px; margin-bottom: 25px; line-height: 1.7; }
+        .day-card { border-left: 8px solid #ccc; padding: 15px; margin-bottom: 15px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .data-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; text-align: center; }
+        .data-value { font-size: 18px; font-weight: bold; color: var(--primary); }
+        .chart-container { height: 300px; margin-bottom: 40px; }
+        .divider { border-top: 1px solid #eee; margin: 25px 0; position: relative; }
+        .divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: white; padding: 0 10px; color: #999; font-size: 12px; }
     </style>
 </head>
 <body>
 
-    <div id="inputPage" class="page active">
+    <div id="authPage" class="page active">
+        <h2 style="color:var(--ntust-red); text-align:center;">👤 APSH 使用者管理</h2>
+        <div class="section">
+            <h4 style="margin-top:0;">新用戶註冊</h4>
+            <input type="text" id="regName" placeholder="姓名 (必填)">
+            <select id="regGender">
+                <option value="male">男 (Male)</option>
+                <option value="female">女 (Female)</option>
+            </select>
+            <label style="font-size: 12px; color: #666;">出生日期 (選填)</label>
+            <input type="date" id="regBirth">
+            <button class="btn-main" onclick="registerUser()">註冊 Patient 資源</button>
+        </div>
+        <div class="divider"><span>或</span></div>
+        <div class="section" style="background: #f9f9f9;">
+            <h4 style="margin-top:0;">已有 ID 登入</h4>
+            <input type="text" id="loginId" placeholder="輸入您的 Patient ID">
+            <button class="btn-query" onclick="loginWithId()">驗證並登入</button>
+        </div>
+    </div>
+
+    <div id="inputPage" class="page">
+        <div class="user-info-bar">
+            <span id="userDisplay">載入中...</span>
+            <button onclick="logout()" style="width:auto; padding:5px 10px; margin:0; background:#e74c3c; color:white;">登出</button>
+        </div>
         <h2 style="color:var(--ntust-red); text-align:center;">📥 生理數據登記</h2>
         <div class="section">
-            <label>Patient ID </label><input type="text" id="patientId" placeholder="110">
-            <label>量測時間</label><input type="datetime-local" id="measureTime">
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <div style="flex:1;"><label>運動類別</label><select id="sportType"><option value="Running">🏃 跑步</option><option value="Swimming">🏊 游泳</option><option value="Weightlifting">🏋️ 重訓</option></select></div>
+            <label>量測時間 (不可預選未來日期)</label>
+            <input type="datetime-local" id="measureTime">
+            <div style="display:flex; gap:10px; margin-top: 10px;">
+                <div style="flex:1;"><label>運動類別</label>
+                    <select id="sportType">
+                        <option value="Running">🏃 跑步</option>
+                        <option value="Weightlifting">🏋️ 重訓</option>
+                        <option value="Swimming">🏊 游泳</option>
+                    </select>
+                </div>
                 <div style="flex:1;"><label>氣溫 (°C)</label><input type="number" id="temp" value="25"></div>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:10px;">
-                <input type="number" id="sbp" placeholder="收縮壓">
-                <input type="number" id="dbp" placeholder="舒張壓">
-                <input type="number" id="hr" placeholder="心率">
+                <div><label>收縮壓</label><input type="number" id="sbp" placeholder="SBP"></div>
+                <div><label>舒張壓</label><input type="number" id="dbp" placeholder="DBP"></div>
+                <div><label>心率</label><input type="number" id="hr" placeholder="HR"></div>
             </div>
-            <button class="btn-main" onclick="uploadData()">✅ 同步至雲端</button>
+            <button class="btn-main" onclick="uploadData()">✅ 同步至 FHIR Observation</button>
         </div>
-        <button class="btn-switch" onclick="switchPage('queryPage')">🔍 進入查詢分析 →</button>
+        <button class="btn-switch" onclick="switchPage('queryPage')">🔍 進入分析報告 →</button>
     </div>
 
     <div id="queryPage" class="page">
-        <button onclick="switchPage('inputPage')" style="background:none; color:var(--info); border:none; cursor:pointer;">← 返回登記</button>
-        <h2 style="text-align:center;">📊 生理分析報告</h2>
-
-        <div class="control-panel">
-            <div style="flex:1;"><label>Patient ID</label><input type="text" id="queryId"></div>
-            <div style="flex:1;"><label>選擇日期</label><input type="date" id="queryDate"></div>
-            <div style="flex:1;"><label>分析模式</label><select id="queryMode"><option value="day">單日詳細列表</option><option value="week">週平均趨勢圖</option></select></div>
-            <button class="btn-query" onclick="fetchAndAnalyze()">開始分析</button>
+        <button onclick="switchPage('inputPage')" style="background:none; color:var(--info); border:none; cursor:pointer; width:auto; text-align:left;">← 返回登記</button>
+        <h2 style="text-align:center;">📊 生理趨勢診斷報告</h2>
+        <div class="section" style="background:#eef2f7;">
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;"><label>基準日期</label><input type="date" id="queryDate"></div>
+                <div style="flex:1;"><label>分析模式</label>
+                    <select id="queryMode">
+                        <option value="day">單日詳細列表 (CRUD)</option>
+                        <option value="week">週平均趨勢 (週一至週日)</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn-query" onclick="fetchAndAnalyze()">執行診斷分析</button>
         </div>
 
-        <div id="resultContent" style="display:none;">
-            <div id="adviceBox" class="advice-card"></div>
-            
-            <div id="dayListSection"></div>
-
-            <div id="weekChartsSection">
-                <h3>🩺 血壓趨勢 (SBP/DBP)</h3><div class="chart-container" style="display:block;"><canvas id="chartBP"></canvas></div>
-                <h3>💓 心率趨勢 (HR)</h3><div class="chart-container" style="display:block;"><canvas id="chartHR"></canvas></div>
-                <h3>🌡️ 氣溫趨勢</h3><div class="chart-container" style="display:block;"><canvas id="chartTemp"></canvas></div>
-            </div>
+        <div id="adviceBox" class="advice-card"></div>
+        <div id="dayListSection"></div>
+        <div id="weekChartsSection" style="display:none;">
+            <h3>🩺 血壓趨勢 (SBP/DBP)</h3><div class="chart-container"><canvas id="chartBP"></canvas></div>
+            <h3>💓 心率負荷趨勢</h3><div class="chart-container"><canvas id="chartHR"></canvas></div>
+            <h3>🌡️ 環境氣溫紀錄</h3><div class="chart-container"><canvas id="chartTemp"></canvas></div>
         </div>
     </div>
 
