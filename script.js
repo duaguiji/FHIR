@@ -1,11 +1,23 @@
 let charts = {};
+let currentPatientId = localStorage.getItem('apsh_id');
+let currentPatientName = localStorage.getItem('apsh_name');
 
-// 初始化
+// --- 介面初始化 ---
 window.onload = () => {
     const now = new Date();
-    const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    document.getElementById('measureTime').value = localNow.toISOString().slice(0, 16);
+    const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
+    
+    // 限制時間選擇不可超過「當下」
+    document.getElementById('measureTime').max = localISO.slice(0, 16);
+    document.getElementById('measureTime').value = localISO.slice(0, 16);
+    document.getElementById('regBirth').max = now.toISOString().slice(0, 10);
+    document.getElementById('queryDate').max = now.toISOString().slice(0, 10);
     document.getElementById('queryDate').value = now.toISOString().slice(0, 10);
+
+    if (currentPatientId) {
+        updateUserUI();
+        switchPage('inputPage');
+    }
 };
 
 function switchPage(pageId) {
@@ -13,7 +25,15 @@ function switchPage(pageId) {
     document.getElementById(pageId).classList.add('active');
 }
 
-// 獲取該週週一
+function updateUserUI() {
+    document.getElementById('userDisplay').innerText = `👤 使用者：${currentPatientName} (ID: ${currentPatientId})`;
+}
+
+function logout() {
+    localStorage.clear();
+    location.reload();
+}
+
 function getMonday(d) {
     d = new Date(d);
     let day = d.getDay();
@@ -21,22 +41,74 @@ function getMonday(d) {
     return new Date(d.setDate(diff));
 }
 
-// 1. 同步資料 (FHIR POST)
+// --- [C] Create Patient (註冊) ---
+async function registerUser() {
+    const name = document.getElementById('regName').value.trim();
+    const gender = document.getElementById('regGender').value;
+    const birth = document.getElementById('regBirth').value;
+
+    if (!name) return alert("請輸入姓名");
+
+    const patientData = {
+        resourceType: "Patient",
+        name: [{ text: name }],
+        gender: gender,
+        managingOrganization: { display: "國立臺灣科技大學電子系運動中心" }
+    };
+    if (birth) patientData.birthDate = birth;
+
+    try {
+        const res = await fetch("https://hapi.fhir.org/baseR4/Patient", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/fhir+json' },
+            body: JSON.stringify(patientData)
+        });
+        const data = await res.json();
+        if (res.ok) {
+            currentPatientId = data.id;
+            currentPatientName = name;
+            localStorage.setItem('apsh_id', data.id);
+            localStorage.setItem('apsh_name', name);
+            updateUserUI();
+            switchPage('inputPage');
+            alert(`註冊成功！您的專屬 ID 為: ${data.id}`);
+        }
+    } catch (e) { alert("連線失敗"); }
+}
+
+// --- [R] Read Patient (登入驗證) ---
+async function loginWithId() {
+    const inputId = document.getElementById('loginId').value.trim();
+    if (!inputId) return alert("請輸入 ID");
+    try {
+        const res = await fetch(`https://hapi.fhir.org/baseR4/Patient/${inputId}`);
+        if (res.status === 404) return alert("找不到此 ID，請重新確認");
+        const data = await res.json();
+        currentPatientId = data.id;
+        currentPatientName = data.name?.[0]?.text || "使用者";
+        localStorage.setItem('apsh_id', currentPatientId);
+        localStorage.setItem('apsh_name', currentPatientName);
+        updateUserUI();
+        switchPage('inputPage');
+        alert(`歡迎回來，${currentPatientName}！`);
+    } catch (e) { alert("驗證失敗"); }
+}
+
+// --- [C] Create Observation (上傳紀錄) ---
 async function uploadData() {
-    const pId = document.getElementById('patientId').value.trim();
+    if (!currentPatientId) return alert("請先登入");
     const sbp = document.getElementById('sbp').value;
     const dbp = document.getElementById('dbp').value;
     const hr = document.getElementById('hr').value;
     const temp = document.getElementById('temp').value;
-    const sport = document.getElementById('sportType').value;
     const mTime = document.getElementById('measureTime').value;
 
-    if(!pId || !sbp || !dbp || !hr) return alert("請完整填寫數據！");
+    if (!sbp || !dbp || !hr) return alert("數據填寫不完整");
 
     const fhirObs = {
         resourceType: "Observation",
         status: "final",
-        subject: { reference: `Patient/${pId}` },
+        subject: { reference: `Patient/${currentPatientId}` },
         effectiveDateTime: new Date(mTime).toISOString(),
         component: [
             { code: { coding: [{ system: "http://loinc.org", code: "8480-6" }] }, valueQuantity: { value: Number(sbp), unit: "mmHg" } },
@@ -44,33 +116,27 @@ async function uploadData() {
             { code: { coding: [{ system: "http://loinc.org", code: "8867-4" }] }, valueQuantity: { value: Number(hr), unit: "BPM" } },
             { code: { coding: [{ system: "http://loinc.org", code: "60832-3" }] }, valueQuantity: { value: Number(temp), unit: "C" } }
         ],
-        note: [{ text: sport }]
+        note: [{ text: document.getElementById('sportType').value }]
     };
 
-    try {
-        const res = await fetch("https://hapi.fhir.org/baseR4/Observation", {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/fhir+json' },
-            body: JSON.stringify(fhirObs)
-        });
-        if (res.ok) alert("✅ 同步成功！");
-    } catch (e) { alert("同步失敗"); }
+    const res = await fetch("https://hapi.fhir.org/baseR4/Observation", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/fhir+json' },
+        body: JSON.stringify(fhirObs)
+    });
+    if (res.ok) alert("✅ 數據已上傳至 FHIR 雲端伺服器");
 }
 
-// 2. 獲取並診斷
+// --- [R] Read Observation (查詢與診斷) ---
 async function fetchAndAnalyze() {
-    const pId = document.getElementById('queryId').value.trim();
     const dateStr = document.getElementById('queryDate').value;
     const mode = document.getElementById('queryMode').value;
-
-    if (!pId || !dateStr) return alert("請輸入 ID 與日期");
-
     let start, end;
     const selDate = new Date(dateStr);
 
     if (mode === 'day') {
-        start = new Date(new Date(dateStr).setHours(0,0,0,0)).toISOString();
-        end = new Date(new Date(dateStr).setHours(23,59,59,999)).toISOString();
+        start = new Date(selDate.setHours(0,0,0,0)).toISOString();
+        end = new Date(selDate.setHours(23,59,59,999)).toISOString();
     } else {
         const mon = getMonday(selDate);
         mon.setHours(0,0,0,0);
@@ -78,130 +144,150 @@ async function fetchAndAnalyze() {
         start = mon.toISOString(); end = sun.toISOString();
     }
 
-    document.getElementById('resultContent').style.display = "block";
-    const response = await fetch(`https://hapi.fhir.org/baseR4/Observation?subject=Patient/${pId}&date=ge${start}&date=le${end}&_sort=date&_count=50`);
-    const bundle = await response.json();
+    const res = await fetch(`https://hapi.fhir.org/baseR4/Observation?subject=Patient/${currentPatientId}&date=ge${start}&date=le${end}&_sort=date`);
+    const bundle = await res.json();
     const data = bundle.entry ? bundle.entry.map(i => i.resource) : [];
-
     renderView(data, mode);
 }
 
-// 3. 診斷與渲染 (整合週警報與日清單)
+// --- 渲染分析視圖與 CDSS 邏輯 ---
 function renderView(data, mode) {
     const adviceBox = document.getElementById('adviceBox');
     const daySection = document.getElementById('dayListSection');
     const weekSection = document.getElementById('weekChartsSection');
-    
+    let alerts = []; // 用於存放異常警訊
     daySection.innerHTML = "";
+
     if (data.length === 0) {
-        adviceBox.innerHTML = "⚠️ 此時段無資料紀錄。";
+        adviceBox.innerHTML = "⚠️ 無量測歷史紀錄。";
         weekSection.style.display = "none";
         return;
     }
 
-    let weekAlerts = []; // 用來存放所有發現的異常
-
     if (mode === 'day') {
-        // --- 單日列表模式 ---
         weekSection.style.display = "none";
         daySection.style.display = "block";
-
+        
         data.forEach(d => {
-            const s = d.component.find(c => c.code.coding[0].code === '8480-6').valueQuantity.value;
-            const db = d.component.find(c => c.code.coding[0].code === '8462-4').valueQuantity.value;
-            const h = d.component.find(c => c.code.coding[0].code === '8867-4').valueQuantity.value;
-            const t = d.component.find(c => c.code.coding[0].code === '60832-3').valueQuantity.value;
+            const s = d.component[0].valueQuantity.value;
+            const db = d.component[1].valueQuantity.value;
+            const h = d.component[2].valueQuantity.value;
+            const t = d.component[3].valueQuantity.value;
             const time = new Date(d.effectiveDateTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            const obsId = d.id;
             
-            // 診斷顏色
-            let statusColor = "var(--success)";
-            if (s >= 160 || db >= 100) statusColor = "red";
-            else if (s >= 140 || db >= 90) statusColor = "orange";
+            let res = getDiagnosis(s, db, h, t);
+
+            // 如果該筆資料有異常 (Level >= 2)，記錄詳細警訊
+            if (res.level >= 2) {
+                alerts.push(`<strong>[${time} 異常提醒]</strong>：檢測到 <strong>${res.status}</strong> (${s}/${db} mmHg)。<br>💡 建議：${res.advice}`);
+            }
 
             daySection.innerHTML += `
-                <div class="day-card" style="border-left-color: ${statusColor}">
-                    <div class="card-header">
-                        <strong>🕒 時間：${time} | 運動：${d.note?.[0]?.text || "一般"}</strong>
+                <div class="day-card" style="border-left: 8px solid ${res.color}; background: #fff; margin-bottom: 15px; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" id="obs-${obsId}">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong>🕒 ${time} | 項目：${d.note?.[0]?.text || '一般'}</strong>
+                        <button class="btn-delete" onclick="deleteObservation('${obsId}')" style="color:red; border:1px solid red; background:none; padding:2px 5px; cursor:pointer; border-radius:4px;">🗑️ 刪除</button>
                     </div>
-                    <div class="data-grid">
-                        <div class="data-item">血壓<div class="data-value">${s}/${db}</div></div>
-                        <div class="data-item">心率<div class="data-value">${h}</div></div>
-                        <div class="data-item">氣溫<div class="data-value">${t}°C</div></div>
+                    <div style="display: flex; justify-content: space-around; margin-top: 10px; text-align: center;">
+                        <div>血壓<div style="font-size: 1.2em; font-weight: bold;">${s}/${db}</div></div>
+                        <div>心率<div style="font-size: 1.2em; font-weight: bold;">${h}</div></div>
+                        <div>氣溫<div style="font-size: 1.2em; font-weight: bold;">${t}°C</div></div>
                     </div>
-                </div>
-            `;
+                </div>`;
         });
-        adviceBox.innerHTML = `<strong>📅 今日摘要：</strong> 已顯示今日所有量測明細。`;
+
+        // 顯示單日摘要建議
+        if (alerts.length > 0) {
+            adviceBox.innerHTML = `<div style="color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 8px;">
+                                    <h4 style="margin-top: 0;">⚠️ 今日異常警訊紀錄：</h4>
+                                    ${alerts.join('<hr style="border: 0; border-top: 1px solid #f5c6cb; margin: 10px 0;">')}
+                                  </div>`;
+            adviceBox.style.borderLeftColor = "red";
+        } else {
+            adviceBox.innerHTML = `<div style="color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px;">
+                                    ✅ <strong>今日狀態穩定：</strong> 共有 ${data.length} 筆量測，生理指標均在正常範圍內。
+                                  </div>`;
+            adviceBox.style.borderLeftColor = "#28a745";
+        }
 
     } else {
-        // --- 週圖表模式 (補回週警報) ---
+        // --- 週模式邏輯 ---
         daySection.style.display = "none";
         weekSection.style.display = "block";
-        
         const weekDays = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"];
-        let buckets = Array.from({length: 7}, () => ({sbp:[], dbp:[], hr:[], temp:[], sports:[]}));
+        let buckets = Array.from({length: 7}, () => ({s:[], db:[], h:[], t:[]}));
 
-        // 掃描每一筆資料，計算平均並抓取異常
         data.forEach(d => {
             const date = new Date(d.effectiveDateTime);
             let idx = date.getDay() === 0 ? 6 : date.getDay() - 1;
-            const dayName = weekDays[idx];
+            const s = d.component[0].valueQuantity.value;
+            const db = d.component[1].valueQuantity.value;
+            const h = d.component[2].valueQuantity.value;
+            const t = d.component[3].valueQuantity.value;
 
-            const s = d.component.find(c => c.code.coding[0].code === '8480-6').valueQuantity.value;
-            const db = d.component.find(c => c.code.coding[0].code === '8462-4').valueQuantity.value;
-            const h = d.component.find(c => c.code.coding[0].code === '8867-4').valueQuantity.value;
-            const t = d.component.find(c => c.code.coding[0].code === '60832-3').valueQuantity.value;
+            buckets[idx].s.push(s); buckets[idx].db.push(db);
+            buckets[idx].h.push(h); buckets[idx].t.push(t);
 
-            // 放入籃子算平均
-            buckets[idx].sbp.push(s); buckets[idx].dbp.push(db);
-            buckets[idx].hr.push(h); buckets[idx].temp.push(t);
-
-            // 🔍 補回的週警報邏輯
-            if (s >= 180 || db >= 110) weekAlerts.push(`🚨 ${dayName}: 【緊急】血壓達急症值 (${s}/${db})！`);
-            else if (s >= 160 || db >= 100) weekAlerts.push(`🔴 ${dayName}: 【危險】二級高血壓 (${s}/${db})`);
-            else if (s >= 140 || db >= 90) weekAlerts.push(`🟠 ${dayName}: 【警告】一級高血壓 (${s}/${db})`);
-            if (h > 180) weekAlerts.push(`🚩 ${dayName}: 心率過高 (${h} BPM)`);
-            if (t > 33 && h > 150) weekAlerts.push(`🌡️ ${dayName}: 高溫運動熱衰竭風險`);
+            // 週模式掃描異常
+            let res = getDiagnosis(s, db, h, t);
+            if (res.level >= 2) {
+                const time = new Date(d.effectiveDateTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                alerts.push(`<strong>${weekDays[idx]} ${time}</strong>: ${res.status} (${s}/${db} mmHg)。💡 ${res.advice}`);
+            }
         });
 
-        const avg = (arr) => arr.length ? Math.round(arr.reduce((a,b)=>a+b)/arr.length) : null;
-        const sbpList = buckets.map(b => avg(b.sbp));
-        const dbpList = buckets.map(b => avg(b.dbp));
-        const hrList = buckets.map(b => avg(b.hr));
-        const tempList = buckets.map(b => avg(b.temp));
-
-        // 渲染警告文字
-        let adviceHtml = `<strong>📊 週分析報告：</strong><br>`;
-        if (weekAlerts.length > 0) {
-            const unique = [...new Set(weekAlerts)];
-            adviceHtml += `<div style="margin-top:10px; padding:10px; background:#fff5f5; border:1px solid #ffcccc; border-radius:8px;">`;
-            unique.forEach(msg => {
-                let color = msg.includes("🚨") || msg.includes("🔴") ? "red" : "orange";
-                adviceHtml += `<div style="color:${color}; font-weight:bold; font-size:14px;">${msg}</div>`;
-            });
-            adviceHtml += `</div>`;
+        let adviceHtml = `<strong>📊 週健康摘要與異常日期：</strong><br>`;
+        if (alerts.length > 0) {
+            adviceHtml += `<div style="margin-top:10px; padding:12px; background:#fff5f5; border:1px solid #ffcccc; border-radius:8px;">
+                            <span style="color:red; font-weight:bold;">⚠️ 本週偵測到以下異常：</span><br>
+                            <ul style="margin: 5px 0; padding-left: 20px;">
+                                ${alerts.map(a => `<li style="margin-bottom:5px;">${a}</li>`).join('')}
+                            </ul>
+                          </div>`;
             adviceBox.style.borderLeftColor = "red";
         } else {
-            adviceHtml += `<span style="color:var(--success);">✅ 本週生理數據全數正常。</span>`;
+            adviceHtml += `<span style="color:var(--success);">✅ 本週生理數據均在安全範圍內。</span>`;
             adviceBox.style.borderLeftColor = "var(--success)";
         }
         adviceBox.innerHTML = adviceHtml;
 
-        // 繪圖
-        drawChart('chartBP', weekDays, [
-            { label: '收縮壓', data: sbpList, color: '#9e1b32' },
-            { label: '舒張壓', data: dbpList, color: '#3498db' }
-        ]);
-        drawChart('chartHR', weekDays, [{ label: '心率', data: hrList, color: '#27ae60' }]);
-        drawChart('chartTemp', weekDays, [{ label: '氣溫', data: tempList, color: '#f39c12' }]);
+        const avg = arr => arr.length ? Math.round(arr.reduce((a,b)=>a+b)/arr.length) : null;
+        drawChart('chartBP', weekDays, [{ label: '收縮壓', data: buckets.map(b => avg(b.s)), color: '#9e1b32' }, { label: '舒張壓', data: buckets.map(b => avg(b.db)), color: '#3498db' }]);
+        drawChart('chartHR', weekDays, [{ label: '心率', data: buckets.map(b => avg(b.h)), color: '#27ae60' }]);
+        drawChart('chartTemp', weekDays, [{ label: '氣溫', data: buckets.map(b => avg(b.t)), color: '#f39c12' }]);
     }
+}
+
+// --- [D] Delete Observation ---
+async function deleteObservation(obsId) {
+    if (!confirm("確定要移除這筆數據嗎？")) return;
+    try {
+        const res = await fetch(`https://hapi.fhir.org/baseR4/Observation/${obsId}`, { method: 'DELETE' });
+        if (res.ok || res.status === 204) {
+            alert("✅ 數據已移除");
+            const element = document.getElementById(`obs-${obsId}`);
+            if (element) element.remove();
+            fetchAndAnalyze();
+        }
+    } catch (e) { alert("刪除失敗"); }
+}
+
+// --- 臨床級診斷引擎 ---
+function getDiagnosis(s, db, h, t) {
+    if (s >= 180 || db >= 110) return { level: 4, status: "🚨 緊急危急值", color: "#9e1b32", advice: "血壓極高！請停止一切活動並立即聯繫醫護或前往急診。" };
+    if (s >= 160 || db >= 100) return { level: 3, status: "🔴 二級高血壓", color: "#d32f2f", advice: "應絕對停止訓練，靜坐休息，若持續未降請諮詢醫療人員。" };
+    if (s >= 140 || db >= 90) return { level: 2, status: "🟠 一級高血壓", color: "#e67e22", advice: "建議調降訓練強度，休息 10 分鐘後再次確認數據。" };
+    if (s > 130) return { level: 1, status: "🟡 偏高", color: "#f1c40f", advice: "目前生理負荷稍重，注意控制情緒與壓力。" };
+    if (t > 33 && h > 155) return { level: 3, status: "🌡️ 熱衰竭預兆", color: "red", advice: "環境氣溫過高且心率異常，請立即移至陰涼處並補充水分。" };
+    return { level: 0, status: "正常穩定", color: "#28a745", advice: "目前狀態優異，請繼續保持規律量測。" };
 }
 
 function drawChart(id, labels, datasets) {
     if (charts[id]) charts[id].destroy();
     charts[id] = new Chart(document.getElementById(id), {
         type: 'line',
-        data: { labels: labels, datasets: datasets.map(d => ({ ...d, borderColor: d.color, tension: 0.3, spanGaps: true })) },
+        data: { labels, datasets: datasets.map(d => ({ ...d, borderColor: d.color, tension: 0.3, spanGaps: true })) },
         options: { responsive: true, maintainAspectRatio: false }
     });
 }
