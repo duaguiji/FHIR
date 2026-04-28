@@ -34,25 +34,28 @@
 <body>
 
     <div id="authPage" class="page active">
-        <h2 style="color:var(--ntust-red); text-align:center;">👤 APSH 使用者管理</h2>
-        <div class="section">
-            <h4 style="margin-top:0;">新用戶註冊</h4>
-            <input type="text" id="regName" placeholder="姓名 (必填)">
-            <select id="regGender">
-                <option value="male">男 (Male)</option>
-                <option value="female">女 (Female)</option>
-            </select>
-            <label style="font-size: 12px; color: #666;">出生日期 (選填)</label>
-            <input type="date" id="regBirth">
-            <button class="btn-main" onclick="registerUser()">註冊 Patient 資源</button>
-        </div>
-        <div class="divider"><span>或</span></div>
-        <div class="section" style="background: #f9f9f9;">
-            <h4 style="margin-top:0;">已有 ID 登入</h4>
-            <input type="text" id="loginId" placeholder="輸入您的 Patient ID">
-            <button class="btn-query" onclick="loginWithId()">驗證並登入</button>
-        </div>
+    <h2>醫療系統登入 / 註冊</h2>
+    
+    <div class="section">
+        <h3>快速登入</h3>
+        <input type="text" id="loginIdCard" placeholder="請輸入身分證字號">
+        <input type="password" id="loginPassword" placeholder="請輸入密碼">
+        <button onclick="loginWithAccount()">登入</button>
     </div>
+
+    <div class="section">
+        <h3>新用戶註冊</h3>
+        <input type="text" id="regName" placeholder="姓名">
+        <input type="text" id="regIdCard" placeholder="身分證字號 (例如: A123456789)">
+        <input type="password" id="regPassword" placeholder="設定密碼 (至少8碼，需包含大小寫字母與數字)">
+        <select id="regGender">
+            <option value="male">生理男</option>
+            <option value="female">生理女</option>
+        </select>
+        <input type="date" id="regBirth">
+        <button onclick="registerUserWithAccount()">註冊新帳號</button>
+    </div>
+</div>
 
     <div id="inputPage" class="page">
         <div class="user-info-bar">

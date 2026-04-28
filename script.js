@@ -42,56 +42,87 @@ function getMonday(d) {
 }
 
 // --- [C] Create Patient (註冊) ---
-async function registerUser() {
-    const name = document.getElementById('regName').value.trim();
+async function registerUserWithAccount() {
+    const name = document.getElementById('regName').value;
+    const idCard = document.getElementById('regIdCard').value.toUpperCase();
+    const password = document.getElementById('regPassword').value;
     const gender = document.getElementById('regGender').value;
     const birth = document.getElementById('regBirth').value;
 
-    if (!name) return alert("請輸入姓名");
+    // 1. 基本檢查與 Regex 驗證
+    if (!name || !idCard || !password || !birth) return alert("請填寫完整資料");
+    if (!checkPasswordStrength(password)) {
+        return alert("密碼格式不符:需至少8碼並包含大小寫字母與數字");
+    }
 
+    if (!checkIdCardFormat(idCard)) {
+        return alert("身分證字號格式錯誤，請重新輸入（範例：A123456789）");
+    }
+
+    // 2. 建立 FHIR Patient JSON
     const patientData = {
         resourceType: "Patient",
         name: [{ text: name }],
         gender: gender,
-        managingOrganization: { display: "國立臺灣科技大學電子系運動中心" }
+        birthDate: birth,
+        // 使用 identifier 存放身分證字號
+        identifier: [{
+            system: "http://www.moi.gov.tw/", // 台灣內政部系統標記
+            value: idCard
+        }],
+        // 使用 extension 存放密碼（實務上應先做雜湊處理）
+        extension: [{
+            url: "http://my-system.com/password",
+            valueString: password 
+        }]
     };
-    if (birth) patientData.birthDate = birth;
 
     try {
-        const res = await fetch("https://hapi.fhir.org/baseR4/Patient", {
+        const res = await fetch('https://hapi.fhir.org/baseR4/Patient', {
             method: 'POST',
             headers: { 'Content-Type': 'application/fhir+json' },
             body: JSON.stringify(patientData)
         });
         const data = await res.json();
-        if (res.ok) {
-            currentPatientId = data.id;
-            currentPatientName = name;
-            localStorage.setItem('apsh_id', data.id);
-            localStorage.setItem('apsh_name', name);
-            updateUserUI();
-            switchPage('inputPage');
-            alert(`註冊成功！您的專屬 ID 為: ${data.id}`);
+        if (data.id) {
+            alert(`註冊成功！你的 ID 是: ${data.id}\n請使用身分證字號登入。`);
+            location.reload();
         }
-    } catch (e) { alert("連線失敗"); }
+    } catch (e) {
+        alert("註冊失敗，請檢查網路連線。");
+    }
 }
 
 // --- [R] Read Patient (登入驗證) ---
-async function loginWithId() {
-    const inputId = document.getElementById('loginId').value.trim();
-    if (!inputId) return alert("請輸入 ID");
+async function loginWithAccount() {
+    const idCard = document.getElementById('loginIdCard').value.toUpperCase();
+    const inputPwd = document.getElementById('loginPassword').value;
+
+    if (!idCard || !inputPwd) return alert("請輸入帳號密碼");
+
     try {
-        const res = await fetch(`https://hapi.fhir.org/baseR4/Patient/${inputId}`);
-        if (res.status === 404) return alert("找不到此 ID，請重新確認");
-        const data = await res.json();
-        currentPatientId = data.id;
-        currentPatientName = data.name?.[0]?.text || "使用者";
-        localStorage.setItem('apsh_id', currentPatientId);
-        localStorage.setItem('apsh_name', currentPatientName);
-        updateUserUI();
-        switchPage('inputPage');
-        alert(`歡迎回來，${currentPatientName}！`);
-    } catch (e) { alert("驗證失敗"); }
+        // 透過 FHIR 查詢參數進行搜尋
+        const res = await fetch(`https://hapi.fhir.org/baseR4/Patient?identifier=${idCard}`);
+        const bundle = await res.json();
+
+        if (bundle.total === 0) return alert("找不到該帳號");
+
+        const patient = bundle.entry[0].resource;
+        const storedPwd = patient.extension.find(ext => ext.url === "http://my-system.com/password").valueString;
+
+        if (inputPwd === storedPwd) {
+            currentPatientId = patient.id;
+            currentPatientName = patient.name[0].text;
+            localStorage.setItem('apsh_id', currentPatientId);
+            localStorage.setItem('apsh_name', currentPatientName);
+            updateUserUI();
+            switchPage('inputPage');
+        } else {
+            alert("密碼錯誤！");
+        }
+    } catch (e) {
+        alert("登入過程發生錯誤。");
+    }
 }
 
 // --- [C] Create Observation (上傳紀錄) ---
@@ -290,4 +321,23 @@ function drawChart(id, labels, datasets) {
         data: { labels, datasets: datasets.map(d => ({ ...d, borderColor: d.color, tension: 0.3, spanGaps: true })) },
         options: { responsive: true, maintainAspectRatio: false }
     });
+}
+
+function checkPasswordStrength(password) {
+    // 正則表達式解釋：
+    // (?=.*[a-z]) : 包含至少一個小寫字母
+    // (?=.*[A-Z]) : 包含至少一個大寫字母
+    // (?=.*\d)    : 包含至少一個數字
+    // .{8,}       : 長度至少 8 碼
+    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    return regex.test(password);
+}
+
+function checkIdCardFormat(id) {
+    // 正則表達式解釋：
+    // ^[A-Z]      : 開頭必須是一個大寫英文字母
+    // [12]        : 第二碼必須是 1 (男) 或 2 (女)
+    // [0-9]{8}$   : 後面接 8 位數字，並結束
+    const idRegex = /^[A-Z][12][0-9]{8}$/;
+    return idRegex.test(id);
 }
