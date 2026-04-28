@@ -341,3 +341,37 @@ function checkIdCardFormat(id) {
     const idRegex = /^[A-Z][12][0-9]{8}$/;
     return idRegex.test(id);
 }
+
+function autoGetWeather() {
+    if (navigator.geolocation) {
+        // 請求定位權限
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            
+            // 呼叫天氣 API
+            await fetchWeatherData(lat, lon);
+        }, () => {
+            alert("無法取得定位，請手動輸入氣溫。");
+        });
+    } else {
+        alert("您的瀏覽器不支援定位功能。");
+    }
+}
+
+async function fetchWeatherData(lat, lon) {
+    try {
+        // Open-Meteo 是一個不需要 Key 的開源 API
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+        const data = await response.json();
+        
+        // 取得當前氣溫
+        const temp = data.current_weather.temperature;
+        
+        // 將數值填入 HTML 的輸入框中
+        document.getElementById('temp').value = Math.round(temp);
+        console.log(`自動抓取成功！目前位置氣溫：${temp}°C`);
+    } catch (error) {
+        console.error("天氣抓取失敗:", error);
+    }
+}
