@@ -2,124 +2,14 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>APSH 2.0 | 智慧生理監測與風險預警系統</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- 引入 jsPDF 用於匯出就醫卡 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <style>
-        :root { --ntust-red: #9e1b32; --primary: #2c3e50; --success: #27ae60; --info: #3498db; --warning: #f39c12; --danger: #d32f2f; --bg: #f4f7f9; }
-        body { font-family: 'PingFang TC', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-        .page { display: none; max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .active { display: block; }
-        .section { border: 1px solid #eee; padding: 20px; border-radius: 10px; margin-bottom: 20px; position: relative; }
-        .badge-risk { position: absolute; top: 10px; right: 10px; padding: 4px 12px; border-radius: 20px; color: white; font-size: 12px; font-weight: bold; }
-        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; margin-bottom: 10px; font-size: 16px; }
-        button { padding: 12px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.3s; width: 100%; margin-bottom: 10px; }
-        .btn-main { background: var(--success); color: white; }
-        .btn-query { background: var(--primary); color: white; }
-        .btn-export { background: var(--info); color: white; }
-        .user-info-bar { background: #eef2f7; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
-        .day-card { border-left: 10px solid #ccc; padding: 20px; margin-bottom: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: 0.3s; }
-        .data-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center; margin: 15px 0; }
-        .dynamic-group { display: none; background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px dashed #ccc; margin-top: 10px; }
-        .diag-box { background: #fffcf0; padding: 15px; border-top: 1px solid #ffeeba; font-size: 14px; color: #856404; border-radius: 0 0 8px 8px; }
-        .summary-box { background: #e8f4fd; border: 1px solid #b8daff; padding: 20px; border-radius: 10px; margin-bottom: 20px; color: #004085; line-height: 1.6; }
-        .chart-container { position: relative; height: 350px; margin-bottom: 40px; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
-        .tag-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .tag-btn { padding: 8px 12px; border: 1px solid #ddd; border-radius: 20px; font-size: 13px; cursor: pointer; background: white; }
-        .tag-btn.selected { background: var(--info); color: white; border-color: var(--info); }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="0; url=FHIR-main/index.html">
+    <title>APSH | Redirect</title>
 </head>
 <body>
-
-    <!-- 1. 登入/註冊頁面 (保留) -->
-    <div id="authPage" class="page active">
-        <h2 style="color:var(--ntust-red); text-align:center;">👤 APSH 系統登入</h2>
-        <div class="section">
-            <input type="text" id="loginIdCard" placeholder="身分證字號">
-            <input type="password" id="loginPassword" placeholder="密碼">
-            <button class="btn-query" onclick="loginWithAccount()">登入系統</button>
-        </div>
-        <div class="section">
-            <h3>新用戶註冊</h3>
-            <input type="text" id="regName" placeholder="姓名">
-            <input type="text" id="regIdCard" placeholder="身分證號碼">
-            <input type="password" id="regPassword" placeholder="設定密碼">
-            <input type="date" id="regBirth">
-            <button class="btn-main" onclick="registerUserWithAccount()">建立帳號</button>
-        </div>
-    </div>
-
-    <!-- 2. 數據登記頁面 (增加情境標籤與視覺反饋) -->
-    <div id="inputPage" class="page">
-        <div class="user-info-bar">
-            <span id="userDisplay">👤 載入中...</span>
-            <button onclick="logout()" style="width:auto; padding:5px 10px; background:var(--danger); color:white;">登出</button>
-        </div>
-        <h2 style="color:var(--ntust-red); text-align:center;">📥 智慧生理與環境登記</h2>
-        
-        <div class="section">
-            <label>1. 生活情境與主觀狀態 (必選)</label>
-            <div class="tag-container" id="lifestyleTags">
-                <div class="tag-btn" onclick="toggleTag(this)" data-val="SleepDeprived">😴 睡眠不足</div>
-                <div class="tag-btn" onclick="toggleTag(this)" data-val="HighStress">🤯 壓力大</div>
-                <div class="tag-btn" onclick="toggleTag(this)" data-val="Caffeine">☕ 咖啡因</div>
-                <div class="tag-btn" onclick="toggleTag(this)" data-val="Sick">🤒 感冒中</div>
-                <div class="tag-btn" onclick="toggleTag(this)" data-val="Normal">😊 狀態良好</div>
-            </div>
-            
-            <label style="margin-top:20px; display:block;">2. 選擇運動項目</label>
-            <select id="sportType" onchange="toggleSportFields()">
-                <option value="General">📍 日常測量 (無運動)</option>
-                <option value="Running">🏃 慢跑/路跑</option>
-                <option value="Weightlifting">🏋️ 重量訓練</option>
-                <option value="HIIT">🔥 高強度間歇訓練</option>
-            </select>
-
-            <div id="recordSection">
-                <input type="datetime-local" id="measureTime">
-                <div class="data-grid">
-                    <div><label>收縮壓</label><input type="number" id="sbp"></div>
-                    <div><label>舒張壓</label><input type="number" id="dbp"></div>
-                    <div><label>心率 (HR)</label><input type="number" id="hr"></div>
-                    <div id="dynamicLabelArea"><label>氣溫/負荷</label><input type="number" id="dynamicVal"></div>
-                </div>
-                
-                <!-- 運動細項 (維持原有動態切換) -->
-                <div id="groupRunning" class="dynamic-group">
-                    <button type="button" onclick="autoGetWeather('dynamicVal')" style="width:auto; font-size:12px;">📍 自動定位氣溫</button>
-                </div>
-
-                <button class="btn-main" onclick="uploadData()">✅ 同步數據並執行風險分析</button>
-            </div>
-        </div>
-        <button class="btn-switch" onclick="switchPage('queryPage')">🔍 進入診斷報表與趨勢圖表 →</button>
-    </div>
-
-    <!-- 3. 分析報表頁面 (增加智慧摘要、雙軸趨勢與就醫卡匯出) -->
-    <div id="queryPage" class="page">
-        <button onclick="switchPage('inputPage')" style="background:none; color:var(--info); border:none; cursor:pointer;">← 返回登記</button>
-        <h2 style="text-align:center;">📊 智慧健康趨勢與風險預警</h2>
-        
-        <div class="section" style="background:#f8f9fa;">
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <input type="date" id="queryDate">
-                <select id="queryMode"><option value="day">單日詳細</option><option value="week">週趨勢診斷</option></select>
-                <button class="btn-query" onclick="fetchAndAnalyze()" style="flex:1;">執行分析</button>
-                <button class="btn-export" onclick="exportMedicalCard()" style="flex:1;">📄 匯出就醫卡</button>
-            </div>
-        </div>
-
-        <div id="intelligenceSummary" class="summary-box" style="display:none;"></div>
-        
-        <div id="dayListSection"></div>
-        
-        <div id="weekChartsSection" style="display:none;">
-            <div class="chart-container"><canvas id="chartBP"></canvas></div>
-            <div class="chart-container"><canvas id="chartHR"></canvas></div>
-        </div>
-    </div>
-
-    <script src="script.js"></script>
+    <script>
+        window.location.replace('FHIR-main/index.html');
+    </script>
+    <p>正在前往 <a href="FHIR-main/index.html">APSH 登入頁</a>...</p>
 </body>
 </html>
